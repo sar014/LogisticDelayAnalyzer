@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import tempfile
 from pipeline import run_pipeline
+from plot_graphs import render_plots_streamlit
+import json
+import re
 
 
 # ---- PAGE CONFIG ----
@@ -38,12 +41,26 @@ if uploaded_file:
         st.success("✅ Analysis Completed!")
 
         st.subheader("🧠 AI Insights & Recommendations")
-        st.markdown(result.raw)
+        st.markdown(result.tasks_output[2].raw)
 
         st.subheader("🧩 Task-wise Outputs")
         for i, task in enumerate(result.tasks_output, 1):
+            if i in (3,4):  # skip visualization task
+                continue
             with st.expander(f"Task {i}: {task.description[:50]}"):
                 st.markdown(task.raw)
+    
+
+        raw_output = result.tasks_output[3].raw
+        match = re.search(r"```json(.*?)```", raw_output, re.DOTALL)
+        if match:
+            raw_output = match.group(1).strip()
+        else:
+            raw_output = raw_output.strip()
+            
+        # Parse JSON safely
+        viz_json = json.loads(raw_output)
+        render_plots_streamlit(viz_json, df)
 
         # Optional download
         # st.download_button(

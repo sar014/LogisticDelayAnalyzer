@@ -2,6 +2,7 @@ import pandas as pd
 import time
 from crewai import Agent, Task, Crew
 from CSV_Loaded import CSVLoaderTool
+from Stats_Generator import StatsTool
 from crewai import LLM
 
 from dotenv import load_dotenv
@@ -11,13 +12,26 @@ load_dotenv()
 # os.environ["OPENAI_API_KEY"] = "dummy" 
 
 os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+os.environ["DEEPSEEK_API_KEY"] = os.getenv("DEEPSEEK_API_KEY")
+os.environ["OPENROUTER_API_KEY"] = os.getenv("OPENROUTER_API_KEY")
 
 # Create ONE LLM instance
 groq_llm = LLM(
     model="groq/llama-3.3-70b-versatile", 
     api_key=os.getenv("GROQ_API_KEY"),
+    max_tokens=300,
+    temperature=0.1,
     max_retries=3
 )
+
+openrouter_llm = LLM(
+    model="openrouter/mistralai/devstral-2512:free",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    temperature=0.1,
+    max_tokens=800
+)
+
 
 ### IN CASE GROQ FAILS ###
 # ollama_llm = LLM(
@@ -29,6 +43,7 @@ groq_llm = LLM(
 
 # ---- AGENTS ----
 csv_tool = CSVLoaderTool()
+stats_tool = StatsTool()
 
 # 1️⃣ Data Understanding Agent
 data_agent = Agent(
@@ -76,6 +91,22 @@ recommendation_agent = Agent(
     allow_delegation=False,
     llm=groq_llm
 )
+
+viz_agent = Agent(
+      role="Logistics Analytics & Visualization Agent",
+      goal="""
+      Decide which charts and metrics best explain
+      shipment delays and operational issues.
+      """,
+      backstory="""
+      You are a data analyst specializing in logistics KPIs.
+      You interpret computed statistics and recommend
+      meaningful visualizations.
+      """,
+      tools=[stats_tool],
+      allow_delegation=False,
+      llm=openrouter_llm
+    )
 
 
 # ---- TASKS ----
@@ -148,7 +179,7 @@ def create_tasks(csv_file):
 
         Your responsibilities:
 
-        1. Generate actionable recommendations to reduce or prevent delays.
+        1. Generate 5 actionable recommendations to reduce or prevent delays.
         2. Each recommendation must directly address an inferred delay cause.
         3. Avoid generic advice; tailor suggestions to the observed data patterns.
         4. If multiple datasets signals exist, prioritize high-impact improvements.
@@ -163,10 +194,75 @@ def create_tasks(csv_file):
         agent=recommendation_agent
     )
 
+    viz_task = Task(
+        description=f"""
+        Based on the CSV file path: {csv_file} and
+        using the statistics provided by the stats_generator tool:
+
+        Your job is to generate visualization plan that can be
+        directly executed in Python.
+
+       Rules:
+        - Generate at most 5 plots (fewer is allowed)
+        - Use ONLY column names that actually exist in the dataset
+        - Do NOT invent data, values, or columns
+        - Set unused fields (x, y, column, aggregation, top_k) to null
+
+        Chart-specific rules:
+        - Pie chart:
+          - Provide ONLY: chart_type, column, metric, insight, top_k
+          - Do NOT provide x or y
+          - Include `top_k` only if category limiting is clearly required
+          - If uncertain, set `top_k` to null
+          - The executor will determine an appropriate limit based on data cardinality
+
+        - Histogram:
+          - Provide column
+          - Set y = null
+          - Do NOT provide top_k
+
+        - Bar chart:
+          - Always provide x
+          - If aggregation is mean or sum, provide y
+          - If aggregation is count, set y = null
+          - Always provide aggregation
+          - Include `top_k` only if category limiting is clearly required
+          - If uncertain, set `top_k` to null
+          - The executor will determine an appropriate limit based on data cardinality
+
+        - Line chart:
+          - Always provide x and y
+          - Always provide aggregation
+
+        - Scatter plot:
+          - Always provide x and y
+          - Do NOT provide aggregation or top_k
+        """,
+        expected_output="""
+        Return ONLY valid JSON in the following format:
+        {
+          "plots": [
+            {
+              "metric": "Metric name",
+              "chart_type": "bar | line | scatter | histogram | pie",
+              "x": "column_name or null",
+              "y": "column_name or null",
+              "column": "column_name or null",
+              "aggregation": "count | mean | sum | null",
+              "top_k": "integer or null",
+              "insight": "Business insight"
+            }
+          ]
+        }
+        """,
+        agent=viz_agent
+      )
+
     return [
         task_data_understanding,
         task_delay_analysis,
-        task_recommendation
+        task_recommendation,
+        viz_task
     ]
 
 
@@ -178,12 +274,14 @@ def run_pipeline(csv_path):
     tasks[0].agent = data_agent
     tasks[1].agent = delay_agent
     tasks[2].agent = recommendation_agent
+    tasks[3].agent = viz_agent
 
     crew = Crew(
-        agents=[data_agent, delay_agent, recommendation_agent],
+        agents=[data_agent, delay_agent, recommendation_agent,viz_agent],
         tasks=tasks,
         verbose=True
     )
 
     result = crew.kickoff()
     return result
+# result = run_pipeline("C:\\Users\\hp\\Desktop\\AIDTM\\GenAI\\End-TermProject\\Final_Code\\logistics-delivery-delay-causes.csv")
