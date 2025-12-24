@@ -4,9 +4,12 @@ from crewai import Agent, Task, Crew
 from CSV_Loaded import CSVLoaderTool
 from Stats_Generator import StatsTool
 from crewai import LLM
+from pydantic import BaseModel
+from typing import List, Optional
 
 from dotenv import load_dotenv
 import os
+
 
 load_dotenv()
 # os.environ["OPENAI_API_KEY"] = "dummy" 
@@ -17,9 +20,9 @@ os.environ["OPENROUTER_API_KEY"] = os.getenv("OPENROUTER_API_KEY")
 
 # Create ONE LLM instance
 groq_llm = LLM(
-    model="groq/llama-3.3-70b-versatile", 
+    model="groq/meta-llama/llama-guard-4-12b", 
     api_key=os.getenv("GROQ_API_KEY"),
-    max_tokens=300,
+    max_tokens=500,
     temperature=0.1,
     max_retries=3
 )
@@ -40,6 +43,28 @@ openrouter_llm = LLM(
 #     max_retries=3
 # )
 
+# --- For the Visualization Agent ---
+class PlotConfig(BaseModel):
+    metric: str
+    chart_type: str
+    x: Optional[str] = None
+    y: Optional[str] = None
+    column: Optional[str] = None
+    aggregation: Optional[str] = None
+    top_k: Optional[int] = None
+    insight: str
+
+class VizPlan(BaseModel):
+    plots: List[PlotConfig]
+
+# --- For the Interpreter Agent ---
+class ExplanationItem(BaseModel):
+    metric: str
+    explanation: List[str]
+
+class InterpretationPlan(BaseModel):
+    chart_explanation: List[ExplanationItem]
+
 
 # ---- AGENTS ----
 csv_tool = CSVLoaderTool()
@@ -57,9 +82,8 @@ data_agent = Agent(
     interpret messy enterprise logistics datasets without
     prior knowledge of their schema.
     """,
-    tools=[csv_tool],
     allow_delegation=False,
-    llm=groq_llm
+    llm=openrouter_llm
 )
 
 # 2️⃣ Delay Cause Agent
@@ -74,7 +98,7 @@ delay_agent = Agent(
     and systemic causes of logistics delays.
     """,
     allow_delegation=False,
-     llm=groq_llm
+     llm=openrouter_llm
 )
 
 # 3️⃣ Recommendation Agent
@@ -89,7 +113,7 @@ recommendation_agent = Agent(
     business decisions for logistics teams.
     """,
     allow_delegation=False,
-    llm=groq_llm
+    llm=openrouter_llm
 )
 
 viz_agent = Agent(
@@ -103,14 +127,31 @@ viz_agent = Agent(
       You interpret computed statistics and recommend
       meaningful visualizations.
       """,
-      tools=[stats_tool],
       allow_delegation=False,
+      max_iter = 5,
       llm=openrouter_llm
     )
+
+viz_interpreter_agent = Agent(
+    role="Data Visualization Interpreter",
+    goal="Explain what each visualization reveals in clear business language",
+    backstory="""
+    You are an expert data analyst who explains charts to non-technical stakeholders.
+    You do not create plots or choose columns.
+    You only interpret what the chart shows and what it means for the business.
+    """,
+    verbose=True,
+    allow_delegation=False,
+    llm=openrouter_llm
+)
 
 
 # ---- TASKS ----
 def create_tasks(csv_file):
+    df = pd.read_csv(csv_file)
+    columns = list(df.columns)
+    sample = df.head(5).to_dict(orient="records")
+
     task_data_understanding = Task(
         description=f"""
         A user has provided a logistics CSV file.
@@ -196,8 +237,15 @@ def create_tasks(csv_file):
 
     viz_task = Task(
         description=f"""
-        Based on the CSV file path: {csv_file} and
-        using the statistics provided by the stats_generator tool:
+        You are a data visualization planner.
+
+        You are given a logistics dataset with the following information:
+
+        📌 Column names:
+        {list(df.columns)}
+
+        📌 Sample rows (first 5):
+        {df.head(5).to_dict(orient="records")}
 
         Your job is to generate visualization plan that can be
         directly executed in Python.
@@ -217,7 +265,7 @@ def create_tasks(csv_file):
           - The executor will determine an appropriate limit based on data cardinality
 
         - Histogram:
-          - Provide column
+          - You must provide exact column name from data
           - Set y = null
           - Do NOT provide top_k
 
@@ -239,7 +287,8 @@ def create_tasks(csv_file):
           - Do NOT provide aggregation or top_k
         """,
         expected_output="""
-        Return ONLY valid JSON in the following format:
+        YOUR OUTPUT MUST BE ONLY THE JSON FOLLOWING VizPlan Schema. 
+        EXAMPLE FORMAT:
         {
           "plots": [
             {
@@ -255,14 +304,42 @@ def create_tasks(csv_file):
           ]
         }
         """,
-        agent=viz_agent
+        agent=viz_agent,
+        output_pydantic=VizPlan
+        # return_json=True
       )
+
+    viz_interpreter_task = Task(
+        description="""
+        You are given: 
+        - The visualization plan from the Visualization Planner.
+        - The chart configuration (chart_type, x, y, column, aggregation)
+
+        Your job is to interpret what each chart reveals in clear business language.
+
+        Rules:
+        - Do not create plots or choose columns.
+        - Only explain what the chart shows and what it means for the business in 5 or less bullet points.
+        - Use simple, jargon-free language.
+        - Do NOT invent trends
+        - Focus on patterns, skew, concentration, outliers, and implications
+        """,
+        expected_output=""" 
+        {
+          "chart_explanation": "Clear explanation of what the chart shows"
+        }
+        """,
+        agent=viz_interpreter_agent,
+        output_pydantic=InterpretationPlan
+        # return_json=True
+    )
 
     return [
         task_data_understanding,
         task_delay_analysis,
         task_recommendation,
-        viz_task
+        viz_task,
+        viz_interpreter_task
     ]
 
 
@@ -275,9 +352,10 @@ def run_pipeline(csv_path):
     tasks[1].agent = delay_agent
     tasks[2].agent = recommendation_agent
     tasks[3].agent = viz_agent
+    tasks[4].agent = viz_interpreter_agent
 
     crew = Crew(
-        agents=[data_agent, delay_agent, recommendation_agent,viz_agent],
+        agents=[data_agent, delay_agent, recommendation_agent,viz_agent, viz_interpreter_agent],
         tasks=tasks,
         verbose=True
     )

@@ -48,7 +48,7 @@ def render_plots_streamlit(json_result, df):
 
         # ---------------- HISTOGRAM ----------------
         elif chart_type == "histogram":
-            col = plot.get("column")
+            col = plot["x"]
             if not col:
                 plt.close(fig)
                 continue
