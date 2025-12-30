@@ -32,7 +32,7 @@ openrouter_llm = LLM(
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1",
     temperature=0.1,
-    max_tokens=800
+    max_tokens=850
 )
 
 
@@ -149,15 +149,27 @@ viz_interpreter_agent = Agent(
 # ---- TASKS ----
 def create_tasks(csv_file):
     df = pd.read_csv(csv_file)
+    total_rows = len(df) 
     columns = list(df.columns)
     sample = df.head(5).to_dict(orient="records")
 
+    numeric_summary = df.describe(include="all").fillna("").to_dict()
+
+    # Optional delay inference helpers
+    unique_values = {
+        col: df[col].dropna().unique()[:10].tolist()
+        for col in df.columns
+    }
+
     task_data_understanding = Task(
         description=f"""
-        A user has provided a logistics CSV file.
-
-        CSV file path: {csv_file}
-
+        You are given a logistics dataset that has ALREADY been loaded and analyzed.
+        Dataset metadata:
+          - Total rows: {total_rows}
+          - Columns: {columns}
+          Sample rows:{sample}
+          Column statistics (precomputed):{numeric_summary}
+          Unique sample values per column:{unique_values}
         Your responsibilities:
 
         1. Load and inspect the dataset using actual rows (not just schema).
@@ -165,9 +177,7 @@ def create_tasks(csv_file):
           - This may be an explicit binary column (e.g., is_delayed, Logistics_Delay),
             shipment status values (Delayed / Delivered),
             or inferred from timestamps (expected vs actual dates).
-        3. Identify columns that may contribute to delays, such as:
-          - Traffic, weather, customs, operational metrics, utilization,
-            waiting time, demand pressure, or any other relevant factors.
+        3. Identify columns that may contribute to delays.
         4. Compute factual summaries from the data, including:
           - Total number of records
           - Number and percentage of delayed shipments
@@ -178,6 +188,12 @@ def create_tasks(csv_file):
           observed in the dataset.
         6. Clearly state any assumptions made due to missing or ambiguous data.
         7. Output only the summary. No need for other explanations or elements being calculated above
+
+        IMPORTANT RULES:
+        - Do NOT invent columns
+        - Do NOT assume access to raw CSV
+        - Use ONLY the provided information
+        - Do NOT perform new calculations
         """,
         expected_output="""
         Output a bullet point, fact-based summary derived strictly from the dataset.
@@ -330,6 +346,7 @@ def create_tasks(csv_file):
         }
         """,
         agent=viz_interpreter_agent,
+        context=[viz_task],
         output_pydantic=InterpretationPlan
         # return_json=True
     )

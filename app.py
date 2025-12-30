@@ -50,6 +50,7 @@ if uploaded_file:
         # -------------------------------------------------
         # TASK-WISE OUTPUTS (SKIP VIS TASK)
         # -------------------------------------------------
+        task_description = ["Understanding Dataset","Delay Causes"]
         st.subheader("🧩 Task-wise Outputs")
 
         for i, task in enumerate(result.tasks_output, start=1):
@@ -61,14 +62,13 @@ if uploaded_file:
             if i in (3,4,5):
                 continue
 
-            with st.expander(f"Task {i}: {task.description[:50]}"):
-                st.write(task.raw)   # ✅ SAFE
+            with st.expander(f"Task {i}: {task_description[i-1]}"):
+                st.write(task.raw)  
 
         # -------------------------------------------------
         # VISUALIZATION JSON EXTRACTION
         # -------------------------------------------------
         raw_viz_output = str(result.tasks_output[3].raw).strip()
-
         # Remove ```json fences if present
         match = re.search(r"```json\s*(.*?)\s*```", raw_viz_output, re.DOTALL)
         if match:
@@ -80,9 +80,22 @@ if uploaded_file:
             st.error("❌ Failed to parse visualization JSON")
             st.code(raw_viz_output)
             st.stop()
+        
+        raw_interpreter_output = str(result.tasks_output[4].raw).strip()
+        match = re.search(r"```json\s*(.*?)\s*```", raw_interpreter_output, re.DOTALL)
+        if match:
+            raw_interpreter_output = match.group(1)
+
+        try:
+            interpreter_json = json.loads(raw_interpreter_output)
+        except json.JSONDecodeError as e:
+            st.error("❌ Failed to parse visualization JSON")
+            st.code(raw_interpreter_output)
+            st.stop()
+
 
         # -------------------------------------------------
         # RENDER PLOTS
         # -------------------------------------------------
         st.subheader("📈 Visual Insights")
-        render_plots_streamlit(viz_json, df)
+        render_plots_streamlit(viz_json, df, interpreter_json)
