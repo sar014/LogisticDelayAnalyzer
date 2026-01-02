@@ -1,8 +1,5 @@
 import pandas as pd
-import time
 from crewai import Agent, Task, Crew
-from CSV_Loaded import CSVLoaderTool
-from Stats_Generator import StatsTool
 from crewai import LLM
 from pydantic import BaseModel
 from typing import List, Optional
@@ -67,10 +64,8 @@ class InterpretationPlan(BaseModel):
 
 
 # ---- AGENTS ----
-csv_tool = CSVLoaderTool()
-stats_tool = StatsTool()
 
-# 1️⃣ Data Understanding Agent
+# Data Understanding Agent
 data_agent = Agent(
     role="Logistics Data Understanding Agent",
     goal="""
@@ -86,7 +81,7 @@ data_agent = Agent(
     llm=openrouter_llm
 )
 
-# 2️⃣ Delay Cause Agent
+# Delay Cause Agent
 delay_agent = Agent(
     role="Delay Cause Intelligence Agent",
     goal="""
@@ -101,7 +96,7 @@ delay_agent = Agent(
      llm=openrouter_llm
 )
 
-# 3️⃣ Recommendation Agent
+# Recommendation Agent
 recommendation_agent = Agent(
     role="Logistics Optimization Advisor",
     goal="""
@@ -257,10 +252,10 @@ def create_tasks(csv_file):
 
         You are given a logistics dataset with the following information:
 
-        📌 Column names:
+         Column names:
         {list(df.columns)}
 
-        📌 Sample rows (first 5):
+         Sample rows (first 5):
         {df.head(5).to_dict(orient="records")}
 
         Your job is to generate visualization plan that can be

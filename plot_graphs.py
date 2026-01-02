@@ -25,7 +25,7 @@ def render_plots_streamlit(json_result, df, explanation_json):
 
         with col_container:
 
-            fig, ax = plt.subplots(figsize=(5.5, 3.8))  # 👈 reduced size
+            fig, ax = plt.subplots(figsize=(5.5, 3.8)) 
             chart_type = plot["chart_type"]
 
             # ---------------- BAR ----------------
@@ -47,7 +47,7 @@ def render_plots_streamlit(json_result, df, explanation_json):
                         plt.close(fig)
                         continue
 
-                if df[x].nunique() > MAX_TOP_K:
+                if df[x].nunique() > MAX_TOP_K: # Returns the number of unique values in the column (an integer).
                     top_k = min(top_k or MAX_TOP_K, MAX_TOP_K)
                     data = data.sort_values(ascending=False).head(top_k)
                 else:

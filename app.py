@@ -42,13 +42,13 @@ if uploaded_file:
         st.success("✅ Analysis Completed!")
 
         # -------------------------------------------------
-        # AI INSIGHTS & RECOMMENDATIONS (SAFE)
+        # AI INSIGHTS & RECOMMENDATIONS 
         # -------------------------------------------------
         st.subheader("🧠 AI Insights & Recommendations")
         st.write(result.tasks_output[2].raw)   
 
         # -------------------------------------------------
-        # TASK-WISE OUTPUTS (SKIP VIS TASK)
+        # TASK-WISE OUTPUTS
         # -------------------------------------------------
         task_description = ["Understanding Dataset","Delay Causes"]
         st.subheader("🧩 Task-wise Outputs")
@@ -59,6 +59,7 @@ if uploaded_file:
             # 2 → Delay Analysis
             # 3 → Recommendations
             # 4 → Visualization
+            # 5 → Visualization interpretation
             if i in (3,4,5):
                 continue
 
