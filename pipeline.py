@@ -374,4 +374,4 @@ def run_pipeline(csv_path):
 
     result = crew.kickoff()
     return result
-# result = run_pipeline("C:\\Users\\hp\\Desktop\\AIDTM\\GenAI\\End-TermProject\\Final_Code\\logistics-delivery-delay-causes.csv")
+result = run_pipeline("C:\\Users\\hp\\Desktop\\AIDTM\\GenAI\\End-TermProject\\Final_Code\\logistics-delivery-delay-causes.csv")
