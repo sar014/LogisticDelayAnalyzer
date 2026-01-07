@@ -79,16 +79,16 @@ if uploaded_file:
 
             # Task 4: viz plan
             if len(outputs) > 3:
-                raw_viz_output = str(outputs[3].raw).strip()
+                raw_viz_output = str(outputs[3].raw).strip() # removes extra whitespace
                 # Remove ```json fences if present
-                match = re.search(r"```json\s*(.*?)\s*```", raw_viz_output, re.DOTALL)
+                match = re.search(r"```json\s*(.*?)\s*```", raw_viz_output, re.DOTALL) # re.DOTALL allows matching across multiple lines
                 if match:
                     raw_viz_output = match.group(1)
                 try:
                     viz_json = json.loads(raw_viz_output)
+                
                 except json.JSONDecodeError:
-                    # If output_pydantic=VizPlan, raw may already be dict-like
-                    if isinstance(outputs.raw, dict):
+                    if isinstance(outputs.raw, dict): # If the output is already a dict, just extract it
                         viz_json = outputs.raw[6]
                     else:
                         st.error("❌ Failed to parse visualization JSON (viz plan).")

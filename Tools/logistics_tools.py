@@ -23,7 +23,7 @@ def delay_column_stats(column_name: str) -> str:
     if series.empty:
         return f"Column '{column_name}' has no data."
 
-    # Simple stats; you can expand this later
+  
     return (
         f"Stats for {column_name}: "
         f"count={len(series)}, "

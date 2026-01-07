@@ -1,4 +1,3 @@
-# main_pipeline.py (your existing file)
 import pandas as pd
 from crewai import Agent, Task, Crew, LLM
 from pydantic import BaseModel
@@ -27,6 +26,7 @@ openrouter_llm = LLM(
 )
 
 # --- For the Visualization Agent ---
+# Template
 class PlotConfig(BaseModel):
     metric: str
     chart_type: str
@@ -37,6 +37,7 @@ class PlotConfig(BaseModel):
     top_k: Optional[int] = None
     insight: str
 
+# list of plotconfig objects
 class VizPlan(BaseModel):
     plots: List[PlotConfig]
 
@@ -57,7 +58,7 @@ data_agent = Agent(
     Understand unknown logistics CSV data and extract
     information relevant for delay analysis.
     """,
-    backstory="""You are an expert in exploratory data analysis...""",
+    backstory="""You are an expert in exploratory data analysis.""",
     allow_delegation=False,
     llm=openrouter_llm,
     tools=[get_dataset_profile, find_delay_columns, compute_delay_stats]
@@ -69,16 +70,16 @@ delay_agent = Agent(
     backstory="""You specialize in uncovering causes of delays...""",
     allow_delegation=False,
     llm=openrouter_llm,
-    tools=[list_delay_factors]  # and maybe compute_delay_stats if needed
+    tools=[list_delay_factors]  
 )
 
 recommendation_agent = Agent(
     role="Logistics Optimization Advisor",
-    goal="""Generate actionable insights...""",
+    goal="""Generate actionable insights.""",
     backstory="""You translate analytical findings into decisions...""",
     allow_delegation=False,
     llm=openrouter_llm,
-    tools=[]  # often just interprets previous outputs
+    tools=[]  
 )
 
 viz_agent = Agent(
@@ -88,7 +89,7 @@ viz_agent = Agent(
     allow_delegation=False,
     max_iter=5,
     llm=openrouter_llm,
-    tools=[compute_delay_stats]  # optional helper
+    tools=[compute_delay_stats]  
 )
 
 viz_interpreter_agent = Agent(
